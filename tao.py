@@ -41,10 +41,18 @@ def load_secrets(path: str = SECRETS_PATH) -> dict:
     if not os.path.exists(path):
         return {}
 
-    mode = os.stat(path).st_mode & 0o777
-    if mode & 0o077:
-        print(f"WARNING: {path} is mode {mode:o}; tighten with "
-              f"chmod 600 {path}", file=sys.stderr)
+    if os.name == "posix":
+        mode = os.stat(path).st_mode & 0o777
+        if mode & 0o077:
+            print(f"WARNING: {path} is mode {mode:o}; tighten with "
+                  f"chmod 600 {path}", file=sys.stderr)
+    else:
+        # POSIX mode bits are meaningless on Windows; os.stat reports 0o666
+        # for every file, so the check above would warn unconditionally.
+        # Restrict via ACL instead:
+        #   icacls "%USERPROFILE%\\.tao_secrets" /inheritance:r /grant:r "%USERNAME%:R"
+        print(f"NOTE: on Windows, restrict {path} with icacls "
+              f"(see comment in load_secrets).", file=sys.stderr)
 
     raw = open(path).read()
     try:
